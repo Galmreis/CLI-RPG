@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "savedAt": "2026-10-08T20:31:03.859Z",
+  "name": "Tester",
+  "level": 1,
+  "exp": 0,
+  "nextLevelExp": 30,
+  "actualHp": 100,
+  "maxHp": 100,
+  "actualMp": 20,
+  "maxMp": 20,
+  "atk": 5,
+  "def": 5,
+  "mAtk": 5,
+  "mDef": 5,
+  "spd": 5,
+  "lck": 5,
+  "skills": [],
+  "passives": [],
+  "gold": 35,
+  "lastSaveSlot": 5,
+  "inventory": [
+    {
+      "id": "potion",
+      "quantity": 99
+    }
+  ],
+  "equipment": {
+    "weapon": null,
+    "chest": null,
+    "shoes": null,
+    "accessory": null
+  },
+  "resistances": {
+    "physical": 1,
+    "fire": 1,
+    "ice": 1,
+    "thunder": 1
+  }
+}

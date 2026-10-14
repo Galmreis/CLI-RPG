@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "savedAt": "2026-10-07T13:46:18.423Z",
+  "name": "Tidus",
+  "level": 1,
+  "exp": 0,
+  "nextLevelExp": 30,
+  "actualHp": 110,
+  "maxHp": 120,
+  "actualMp": 25,
+  "maxMp": 25,
+  "atk": 10,
+  "def": 5,
+  "mAtk": 5,
+  "mDef": 5,
+  "spd": 5,
+  "lck": 5,
+  "skills": [],
+  "passives": [],
+  "inventory": [
+    {
+      "id": "potion",
+      "quantity": 98
+    }
+  ],
+  "equipment": {}
+}

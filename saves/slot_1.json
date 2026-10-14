@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "savedAt": "2026-10-07T12:48:44.272Z",
+  "name": "Auron",
+  "level": 4,
+  "exp": 110,
+  "nextLevelExp": 250,
+  "actualHp": 160,
+  "maxHp": 160,
+  "actualMp": 40,
+  "maxMp": 40,
+  "atk": 18,
+  "def": 12,
+  "mAtk": 7,
+  "mDef": 8,
+  "spd": 10,
+  "lck": 14,
+  "skills": [
+    "fire1",
+    "heal1",
+    "powerup1"
+  ],
+  "passives": [
+    "vigor"
+  ],
+  "inventory": [
+    {
+      "id": "potion",
+      "qty": 2
+    }
+  ],
+  "equipment": {
+    "weapon": "katana"
+  }
+}

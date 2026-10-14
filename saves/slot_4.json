@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "savedAt": "2026-10-08T20:31:03.633Z",
+  "name": "DungeonExplorer",
+  "level": 1,
+  "exp": 0,
+  "nextLevelExp": 30,
+  "actualHp": 120,
+  "maxHp": 150,
+  "actualMp": 30,
+  "maxMp": 30,
+  "atk": 5,
+  "def": 5,
+  "mAtk": 5,
+  "mDef": 5,
+  "spd": 5,
+  "lck": 5,
+  "skills": [],
+  "passives": [],
+  "gold": 100,
+  "lastSaveSlot": 4,
+  "inventory": [],
+  "equipment": {
+    "weapon": null,
+    "chest": null,
+    "shoes": null,
+    "accessory": null
+  },
+  "resistances": {
+    "physical": 1,
+    "fire": 1,
+    "ice": 1,
+    "thunder": 1
+  }
+}
