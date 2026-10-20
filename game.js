@@ -10,8 +10,10 @@ const { runBattle } = require('./battle');
 const { PASSIVES } = require('./passives');
 const storage = require('./storage');
 const { ITEMS, useItem, addItem, getItemCount, ITEM_CAP } = require('./items');
-const { EQUIPMENT, EQUIPMENT_SLOTS, equipItem, unequipItem } = require('./equipment');
-const { selectMenu, allocateStatsMenu, enterAlternateScreen, exitAlternateScreen, showCursor, hideCursor, clearScreenHome } = require('./menu');
+const { EQUIPMENT, EQUIPMENT_SLOTS, equipItem, unequipItem, addEquipment, generateRandomLoot } = require('./equipment');
+const { selectMenu, allocateStatsMenu, isHeadlessMode, enterAlternateScreen, exitAlternateScreen, showCursor, hideCursor, clearScreenHome } = require('./menu');
+const { renderDungeonScreen, animateDungeonStep } = require('./ui');
+const { SKILLS, getSkillsForLevel } = require('./skills');
 
 
 
@@ -66,6 +68,21 @@ async function checkLevelUp(player, rl) {
     player.actualHp = player.totalMaxHp || player.maxHp;
     player.actualMp = player.totalMaxMp || player.maxMp;
     console.log("\n  All AP distributed! Health and Mana fully restored.");
+
+    // Check for newly unlocked skills at this level
+    const archetype = player.archetype || 'warrior';
+    const newSkills = getSkillsForLevel(archetype, player.level);
+    const learned = [];
+    for (const skillId of newSkills) {
+      if (!player.skills.includes(skillId)) {
+        player.skills.push(skillId);
+        learned.push(SKILLS[skillId] ? SKILLS[skillId].name : skillId);
+      }
+    }
+    if (learned.length > 0) {
+      console.log(`  ✨ NEW SKILL LEARNED: ${learned.join(', ')}!`);
+    }
+
     console.log("==================================================================");
     showCursor();
     await rl.question("  Press Enter to continue...");
@@ -466,104 +483,197 @@ async function handleDungeonDefeat(hero, rl) {
 }
 
 /**
- * Interactive Dungeon Exploration loop with persistent vitals and 5-kill boss threshold.
+ * SMT-style First-Person 5-Floor Dungeon Crawler loop.
+ * Features perspective ASCII scenes, 4-frame step zoom, level-scaled encounters,
+ * treasure chests with randomized gear, healing springs, and descent to the Goblin King.
  * @param {Combatant} hero
  * @param {readline.Interface} rl
  * @returns {Promise<Combatant>}
  */
 async function exploreDungeon(hero, rl) {
-  let dungeonKills = 0;
-  let inDungeon = true;
+  const dungeonState = {
+    floor: 1, // 1 to 5
+    depth: 0,
+    maxDepth: 5,
+    currentScene: 'corridor', // 'corridor' | 'chest' | 'spring' | 'stairs' | 'boss_gate'
+    chestLoot: null,
+    log: 'You step into the cold, ancient corridors of Floor B1F.',
+  };
 
-  console.log("\n  You descend the stone staircase into the damp Dungeon of Trials...");
+  let inDungeon = true;
 
   while (inDungeon) {
     if (!hero.isAlive()) {
       return await handleDungeonDefeat(hero, rl);
     }
 
-    const bossUnlocked = dungeonKills >= 5;
-    const dungeonOptions = [
-      "Push deeper into the dungeon",
-      "Use item from bag",
-      `Challenge the Goblin King ${bossUnlocked ? '[UNLOCKED]' : '[LOCKED - Defeat 5 monsters]'}`,
-      "Retreat to town",
-    ];
+    // Determine available menu actions based on current scene
+    const options = [];
+    if (dungeonState.currentScene === 'corridor') {
+      options.push({ label: 'Move Forward (Step Deeper)', action: 'move' });
+      options.push({ label: 'Use Item from Bag', action: 'bag' });
+      options.push({ label: 'Manage Equipment', action: 'equip' });
+      options.push({ label: 'Retreat to Town', action: 'retreat' });
+    } else if (dungeonState.currentScene === 'chest') {
+      options.push({ label: 'Open Treasure Chest', action: 'open_chest' });
+      options.push({ label: 'Leave Chest & Move Forward', action: 'move' });
+      options.push({ label: 'Use Item from Bag', action: 'bag' });
+      options.push({ label: 'Retreat to Town', action: 'retreat' });
+    } else if (dungeonState.currentScene === 'spring') {
+      options.push({ label: 'Drink from Healing Spring', action: 'drink_spring' });
+      options.push({ label: 'Leave Spring & Move Forward', action: 'move' });
+      options.push({ label: 'Use Item from Bag', action: 'bag' });
+      options.push({ label: 'Retreat to Town', action: 'retreat' });
+    } else if (dungeonState.currentScene === 'stairs') {
+      options.push({ label: `Descend Staircase to Floor B${dungeonState.floor + 1}F`, action: 'descend' });
+      options.push({ label: `Keep Exploring Floor B${dungeonState.floor}F`, action: 'move' });
+      options.push({ label: 'Use Item from Bag', action: 'bag' });
+      options.push({ label: 'Retreat to Town', action: 'retreat' });
+    } else if (dungeonState.currentScene === 'boss_gate') {
+      options.push({ label: 'Challenge the Goblin King Boss!', action: 'boss' });
+      options.push({ label: 'Prepare: Use Item from Bag', action: 'bag' });
+      options.push({ label: 'Prepare: Manage Equipment', action: 'equip' });
+      options.push({ label: 'Retreat to Town', action: 'retreat' });
+    }
 
     const res = await selectMenu({
       header: () => {
-        console.log("\n=================== DUNGEON OF TRIALS ===================");
-        console.log(`Explorer: ${hero.name} (Lv. ${hero.level}) | HP: ${hero.actualHp}/${hero.totalMaxHp} | MP: ${hero.actualMp}/${hero.totalMaxMp} | Gold: ${hero.gold || 0}G`);
-        console.log(`Monsters Vanquished: ${dungeonKills} / 5 ${bossUnlocked ? '★ [BOSS CHAMBER UNSEALED!]' : ''}`);
-        console.log("---------------------------------------------------------");
+        renderDungeonScreen(hero, dungeonState, dungeonState.currentScene, dungeonState.log);
       },
-      items: dungeonOptions,
+      items: options.map((o) => o.label),
       allowCancel: true,
-      cancelLabel: "Retreat to town",
-      clearScreen: true,
+      cancelLabel: 'Retreat to Town',
+      clearScreen: false,
       rl,
     });
 
-    if (res.cancelled || res.index === 3 || res.index === -1) {
+    if (res.cancelled || res.index === -1) {
       console.log("\n  You cautiously retrace your steps through the winding halls and return to Town.");
+      showCursor();
+      await rl.question("  Press Enter to return...");
+      hideCursor();
       inDungeon = false;
       break;
     }
 
-    if (res.index === 0) {
-      // Encounter random monster from bestiary
-      const monsterKeys = ['goblin', 'wolf', 'golem'];
-      const randomKey = monsterKeys[Math.floor(Math.random() * monsterKeys.length)];
-      const enemy = createEnemy(randomKey);
+    const chosenAction = options[res.index] ? options[res.index].action : 'retreat';
 
-      console.log(`\n  Footsteps echo in the dark corridor... An aggressive ${enemy.name} emerges!`);
-      const battleResult = await runBattle(hero, enemy, rl);
-
-      if (battleResult.outcome === 'victory') {
-        hero.exp += battleResult.expGained;
-        console.log(`\n  Earned ${battleResult.expGained} EXP! (Total: ${hero.exp}/${hero.nextLevelExp})`);
-        await checkLevelUp(hero, rl);
-        dungeonKills++;
-
-        if (dungeonKills === 5) {
-          console.log("\n  *****************************************************************");
-          console.log("  >>> A loud rumble shakes the stone walls!                       <<<");
-          console.log("  >>> The heavy gate leading to the Goblin King's lair unlocks!   <<<");
-          console.log("  *****************************************************************");
-
-          showCursor();
-          const promptBoss = (await rl.question("  Do you wish to challenge the Goblin King now? (y/n): ")).trim().toLowerCase();
-          hideCursor();
-          if (promptBoss === 'y' || promptBoss === 'yes') {
-            await enterBossLair(hero, rl);
-            if (!hero.isAlive()) {
-              return await handleDungeonDefeat(hero, rl);
-            }
-            if (hero.bossDefeated) {
-              inDungeon = false;
-              break;
-            }
-          } else {
-            console.log("  You step back into the corridor to prepare yourself.");
-          }
-        }
-      } else {
-        // Player defeated in dungeon battle
+    if (chosenAction === 'retreat') {
+      console.log("\n  You cautiously retrace your steps through the winding halls and return to Town.");
+      showCursor();
+      await rl.question("  Press Enter to return...");
+      hideCursor();
+      inDungeon = false;
+      break;
+    } else if (chosenAction === 'bag') {
+      await showTownItemMenu(hero, rl);
+    } else if (chosenAction === 'equip') {
+      await showEquipmentMenu(hero, rl);
+    } else if (chosenAction === 'open_chest') {
+      const loot = dungeonState.chestLoot || generateRandomLoot(dungeonState.floor);
+      if (loot.type === 'gold') {
+        hero.gold = (hero.gold || 0) + loot.gold;
+        dungeonState.log = `You pry open the chest and find a pouch containing ${loot.name}!`;
+      } else if (loot.type === 'item') {
+        addItem(hero.inventory, loot.id, loot.quantity || 1);
+        dungeonState.log = `You open the chest and retrieve ${loot.name}!`;
+      } else if (loot.type === 'equipment') {
+        addEquipment(hero.inventory, loot.id, 1);
+        dungeonState.log = `★ Rare find! You acquired [${loot.name}] (${loot.slot.toUpperCase()})!`;
+      }
+      dungeonState.chestLoot = null;
+      dungeonState.currentScene = 'corridor';
+      renderDungeonScreen(hero, dungeonState, 'corridor', dungeonState.log);
+      showCursor();
+      await rl.question("  Press Enter to continue...");
+      hideCursor();
+    } else if (chosenAction === 'drink_spring') {
+      hero.actualHp = hero.totalMaxHp || hero.maxHp;
+      hero.actualMp = hero.totalMaxMp || hero.maxMp;
+      dungeonState.log = "The sparkling waters wash away all fatigue. Health and Mana are completely restored!";
+      dungeonState.currentScene = 'corridor';
+      renderDungeonScreen(hero, dungeonState, 'corridor', dungeonState.log);
+      showCursor();
+      await rl.question("  Press Enter to continue...");
+      hideCursor();
+    } else if (chosenAction === 'descend') {
+      dungeonState.floor++;
+      dungeonState.depth = 0;
+      dungeonState.currentScene = 'corridor';
+      dungeonState.log = `You descend the winding spiral staircase and reach Floor B${dungeonState.floor}F!`;
+      renderDungeonScreen(hero, dungeonState, 'corridor', dungeonState.log);
+      showCursor();
+      await rl.question("  Press Enter to proceed...");
+      hideCursor();
+    } else if (chosenAction === 'boss') {
+      await enterBossLair(hero, rl);
+      if (!hero.isAlive()) {
         return await handleDungeonDefeat(hero, rl);
       }
-    } else if (res.index === 1) {
-      await showTownItemMenu(hero, rl);
-    } else if (res.index === 2) {
-      if (dungeonKills < 5) {
-        console.log("\n  The boss chamber is sealed by enchanted goblin wards! Defeat at least 5 monsters to unseal it.");
+      if (hero.bossDefeated) {
+        inDungeon = false;
+        break;
       } else {
-        await enterBossLair(hero, rl);
-        if (!hero.isAlive()) {
-          return await handleDungeonDefeat(hero, rl);
+        dungeonState.currentScene = 'boss_gate';
+        dungeonState.log = 'You stand before the heavy iron gates of the Goblin King.';
+      }
+    } else if (chosenAction === 'move') {
+      // Step animation
+      await animateDungeonStep(hero, dungeonState, { headless: isHeadlessMode(rl) });
+      dungeonState.depth++;
+
+      // Check for staircase / boss gate at max depth
+      if (dungeonState.depth >= dungeonState.maxDepth) {
+        if (dungeonState.floor === 5) {
+          dungeonState.currentScene = 'boss_gate';
+          dungeonState.log = "A towering skull-engraved gate stands before you! The Goblin King's lair awaits!";
+        } else {
+          dungeonState.currentScene = 'stairs';
+          dungeonState.log = `You discover stone steps leading down to Floor B${dungeonState.floor + 1}F!`;
         }
-        if (hero.bossDefeated) {
-          inDungeon = false;
-          break;
+      } else {
+        // Roll encounter event: 50% Monster combat, 25% Chest, 20% Spring, 5% Quiet Hallway
+        const roll = Math.random();
+        if (roll < 0.50) {
+          // Combat encounter scaled to floor
+          let pool = ['goblin'];
+          if (dungeonState.floor === 2) pool = ['goblin', 'wolf'];
+          else if (dungeonState.floor === 3) pool = ['wolf', 'golem'];
+          else if (dungeonState.floor === 4) pool = ['wolf', 'golem', 'goblin'];
+          else if (dungeonState.floor === 5) pool = ['wolf', 'golem', 'smallGoblin'];
+
+          const chosenKey = pool[Math.floor(Math.random() * pool.length)];
+          const monsterLevel = Math.max(1, (dungeonState.floor - 1) * 2 + (Math.random() < 0.5 ? 1 : 2));
+          const enemy = createEnemy(chosenKey, monsterLevel);
+
+          dungeonState.log = `A hostile ${enemy.name} blocks your path in Floor B${dungeonState.floor}F!`;
+          renderDungeonScreen(hero, dungeonState, 'corridor', dungeonState.log);
+          showCursor();
+          await rl.question("  Press Enter to engage in combat...");
+          hideCursor();
+
+          const battleResult = await runBattle(hero, enemy, rl);
+          if (battleResult.outcome === 'victory') {
+            hero.exp += battleResult.expGained;
+            await checkLevelUp(hero, rl);
+            dungeonState.currentScene = 'corridor';
+            dungeonState.log = `Vanquished ${enemy.name}! Gained ${battleResult.expGained} EXP and ${battleResult.goldGained} Gold.`;
+          } else {
+            return await handleDungeonDefeat(hero, rl);
+          }
+        } else if (roll < 0.75) {
+          // Treasure Chest
+          dungeonState.currentScene = 'chest';
+          dungeonState.chestLoot = generateRandomLoot(dungeonState.floor);
+          dungeonState.log = `You stumble upon an ancient treasure chest nestled in the corridor!`;
+        } else if (roll < 0.95) {
+          // Healing Spring
+          dungeonState.currentScene = 'spring';
+          dungeonState.log = `A radiant azure spring bubbles from the rocks, emanating peaceful energy.`;
+        } else {
+          // Quiet corridor
+          dungeonState.currentScene = 'corridor';
+          dungeonState.log = `The air grows colder as you journey deeper into Floor B${dungeonState.floor}F.`;
         }
       }
     }
@@ -582,6 +692,9 @@ async function main() {
   try {
     enterAlternateScreen();
     let hero = null;
+
+    // Ensure pre-configured developer test sandbox save exists in Slot 5
+    await storage.ensureDevSaveSlot();
 
     // Startup Title Screen: New Game, Load Game, or Exit
     while (!hero) {
@@ -610,12 +723,40 @@ async function main() {
         hideCursor();
         const heroName = inputName || 'Hero';
 
-        hero = new Combatant(heroName, 120, 25, 12, 8, 8, 6, 11, 10, false);
-        hero.skills = [
-          'fire1', 'thunder1', 'ice1', 'heal1', 'protect1', 'powerup1',
-          'heavySlash', 'armorBreak', 'quickStrike',
-          'firestorm1', 'thunderstorm1', 'blizzard1', 'whirlwind',
-        ];
+        const classRes = await selectMenu({
+          header: `\n=== CHOOSE YOUR ARCHETYPE FOR ${heroName.toUpperCase()} ===`,
+          items: [
+            "Warrior - Blade & Might (High HP & ATK, starts with Quick Strike & Heavy Slash)",
+            "Mage    - Spells & Wisdom (High MP & M.ATK, starts with Fire I & Heal I)",
+          ],
+          clearScreen: true,
+          rl,
+        });
+
+        const isMage = classRes.index === 1;
+
+        if (isMage) {
+          hero = new Combatant(heroName, 100, 35, 7, 6, 13, 10, 10, 9, false);
+          hero.archetype = 'mage';
+          hero.skills = ['fire1', 'heal1'];
+          hero.equipment = {
+            weapon: 'leather_shiv',
+            chest: null,
+            shoes: 'leather_boots',
+            accessory: 'leather_wristband',
+          };
+        } else {
+          hero = new Combatant(heroName, 130, 15, 14, 9, 5, 6, 10, 8, false);
+          hero.archetype = 'warrior';
+          hero.skills = ['quickStrike', 'heavySlash'];
+          hero.equipment = {
+            weapon: 'leather_shiv',
+            chest: 'leather_chest',
+            shoes: 'leather_boots',
+            accessory: null,
+          };
+        }
+
         hero.passives = ['vigor'];
         hero.level = 1;
         hero.exp = 0;
@@ -624,17 +765,11 @@ async function main() {
         hero.inventory = [
           { id: 'potion', quantity: 2 },
         ];
-        hero.equipment = {
-          weapon: 'leather_shiv',
-          chest: 'leather_chest',
-          shoes: 'leather_boots',
-          accessory: 'leather_wristband',
-        };
         // Initial health & mana adjusted for equipment bonuses
         hero.actualHp = hero.totalMaxHp;
         hero.actualMp = hero.totalMaxMp;
 
-        console.log(`\n  Greetings, ${hero.name}! Your adventure begins.`);
+        console.log(`\n  Greetings, ${hero.name} the ${hero.archetype.toUpperCase()}! Your adventure begins.`);
         showCursor();
         await rl.question("  Press Enter to enter Town...");
         hideCursor();
@@ -707,6 +842,7 @@ async function main() {
           `Goblin      - ${MONSTERS.goblin.description} (+${MONSTERS.goblin.exp} EXP)`,
           `Forest Wolf - ${MONSTERS.wolf.description} (+${MONSTERS.wolf.exp} EXP)`,
           `Iron Golem  - ${MONSTERS.golem.description} (+${MONSTERS.golem.exp} EXP)`,
+          `[DEV SANDBOX] Training Dummies (999 DEF, 999 LCK, Elemental Prism)`,
           "Return to Town",
         ];
 
@@ -719,7 +855,46 @@ async function main() {
           rl,
         });
 
-        if (arenaRes.cancelled || arenaRes.index === 3 || arenaRes.index === -1) {
+        if (arenaRes.cancelled || arenaRes.index === 4 || arenaRes.index === -1) {
+          continue;
+        }
+
+        if (arenaRes.index === 3) {
+          // DEVELOPER TESTING SANDBOX
+          const sandboxRes = await selectMenu({
+            header: "\n=== COMBAT TESTING SANDBOX (TRAINING DUMMIES) ===",
+            items: [
+              `Iron Colossus   - ${MONSTERS.ironColossus.description}`,
+              `Shadow Mirage   - ${MONSTERS.shadowMirage.description}`,
+              `Elemental Prism - ${MONSTERS.elementalPrism.description}`,
+              "Back to Arena Selection",
+            ],
+            allowCancel: true,
+            cancelLabel: "Back to Arena Selection",
+            clearScreen: true,
+            rl,
+          });
+
+          if (sandboxRes.cancelled || sandboxRes.index === 3 || sandboxRes.index === -1) {
+            continue;
+          }
+
+          const dummyKeys = ['ironColossus', 'shadowMirage', 'elementalPrism'];
+          const dummyKey = dummyKeys[sandboxRes.index];
+          if (dummyKey) {
+            const dummy = createEnemy(dummyKey);
+            const savedHp = hero.actualHp;
+            const savedMp = hero.actualMp;
+            console.log(`\n  >>> Commencing simulation match against ${dummy.name}... <<<`);
+            await runBattle(hero, dummy, rl);
+            // Restore player HP and MP after sandbox test for zero-friction iteration
+            hero.actualHp = savedHp;
+            hero.actualMp = savedMp;
+            console.log("\n  [SANDBOX NOTE] Simulation ended. Hero HP/MP fully restored to pre-match state.");
+            showCursor();
+            await rl.question("  Press Enter to return to Arena...");
+            hideCursor();
+          }
           continue;
         }
 
@@ -750,6 +925,7 @@ async function main() {
         console.log("==================================================================");
         console.log(`                  HERO PROFILE: ${hero.name.toUpperCase()}                 `);
         console.log("==================================================================");
+        console.log(`  Archetype:   ${(hero.archetype || 'warrior').toUpperCase()}`);
         console.log(`  Level:       ${hero.level}`);
         console.log(`  Experience:  ${hero.exp} / ${hero.nextLevelExp} EXP`);
         console.log(`  Health (HP): ${hero.actualHp} / ${hero.totalMaxHp} (Base: ${hero.maxHp})`);

@@ -91,6 +91,19 @@ async function runTests() {
   assert.strictEqual(chosenTarget, enemy2, "selectTarget should return chosen enemy index");
   console.log("  ✓ Test 4 Passed: Target selection handles single and multiple enemies accurately.");
 
+  // Test 5: Verify Combat Animations safe execution in headless mode
+  console.log("\n[Test 5] Verifying Combat FX animations (Shake, Flash, Dodge)...");
+  const { animateScreenShake, animateWeaknessFlash, animateDodge } = require('./ui');
+  assert.strictEqual(typeof animateScreenShake, 'function', "animateScreenShake should be a function");
+  assert.strictEqual(typeof animateWeaknessFlash, 'function', "animateWeaknessFlash should be a function");
+  assert.strictEqual(typeof animateDodge, 'function', "animateDodge should be a function");
+
+  // Call them directly with headless: true
+  await animateScreenShake(hero, enemyParty, [hero], "Test shake", 0, { headless: true });
+  await animateWeaknessFlash(hero, enemyParty, [hero], "Test flash", 0, { headless: true });
+  await animateDodge(hero, enemyParty, [hero], "Test dodge", 0, { headless: true });
+  console.log("  ✓ Test 5 Passed: Combat FX animations execute safely in headless mode.");
+
   console.log("\n========================================================");
   console.log("  >>> ALL GOBLIN KING & MULTI-ENEMY TESTS PASSED! <<<");
   console.log("========================================================\n");

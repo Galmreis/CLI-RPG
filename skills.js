@@ -435,6 +435,50 @@ const SKILLS = {
   },
 };
 
+/**
+ * Skill learning progression table mapped by class archetype and level milestones.
+ * Both paths converge by Level 10 so high-level characters master the complete arsenal.
+ */
+const SKILL_PROGRESSION = {
+  warrior: {
+    1: ['quickStrike', 'heavySlash'],
+    2: ['protect1'],
+    3: ['armorBreak'],
+    4: ['powerup1'],
+    5: ['whirlwind'],
+    6: ['ice1', 'thunder1'],
+    7: ['heal1'],
+    8: ['fire1'],
+    9: ['firestorm1', 'blizzard1'],
+    10: ['thunderstorm1'],
+  },
+  mage: {
+    1: ['fire1', 'heal1'],
+    2: ['ice1', 'protect1'],
+    3: ['thunder1'],
+    4: ['powerup1'],
+    5: ['firestorm1'],
+    6: ['blizzard1', 'thunderstorm1'],
+    7: ['quickStrike', 'heavySlash'],
+    8: ['armorBreak'],
+    9: ['whirlwind'],
+    10: ['whirlwind'], // All mastered
+  },
+};
+
+/**
+ * Returns an array of skill IDs unlocked at a specific level for the given archetype.
+ * @param {string} archetype - 'warrior' or 'mage'
+ * @param {number} level - Hero level
+ * @returns {string[]}
+ */
+function getSkillsForLevel(archetype, level) {
+  const table = SKILL_PROGRESSION[archetype] || SKILL_PROGRESSION.warrior;
+  return table[level] || [];
+}
+
 module.exports = {
   SKILLS,
+  SKILL_PROGRESSION,
+  getSkillsForLevel,
 };

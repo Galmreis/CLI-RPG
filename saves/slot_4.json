@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "savedAt": "2026-10-08T20:31:03.633Z",
+  "savedAt": "2026-10-20T01:09:39.829Z",
   "name": "DungeonExplorer",
   "level": 1,
   "exp": 0,
@@ -17,6 +17,7 @@
   "lck": 5,
   "skills": [],
   "passives": [],
+  "archetype": "warrior",
   "gold": 100,
   "lastSaveSlot": 4,
   "inventory": [],

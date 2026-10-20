@@ -50,6 +50,7 @@ function serializePlayer(player) {
     lck: player.lck,
     skills: player.skills ? [...player.skills] : [],
     passives: player.passives ? [...player.passives] : [],
+    archetype: player.archetype || 'warrior',
     gold: player.gold || 0,
     lastSaveSlot: player.lastSaveSlot || null,
     // Future-ready slots for upcoming systems
@@ -85,6 +86,7 @@ function hydratePlayer(data) {
   player.nextLevelExp = data.nextLevelExp;
   player.gold = typeof data.gold === 'number' ? data.gold : 0;
   player.lastSaveSlot = data.lastSaveSlot || null;
+  player.archetype = data.archetype || 'warrior';
   player.skills = data.skills || [];
   player.passives = data.passives || [];
   player.inventory = data.inventory || [];
@@ -114,7 +116,8 @@ async function listSlots() {
       const content = await fs.readFile(filePath, 'utf8');
       const data = JSON.parse(content);
       const dateStr = data.savedAt ? new Date(data.savedAt).toLocaleString() : 'Unknown date';
-      const summary = `${data.name} (Lv. ${data.level}) | HP: ${data.actualHp}/${data.maxHp} | Gold: ${data.gold || 0}G | Saved: ${dateStr}`;
+      const devTag = (data.name === 'DevTester' || data.isDevSlot) ? '[DEV LAB] ' : '';
+      const summary = `${devTag}${data.name} (Lv. ${data.level}) | HP: ${data.actualHp}/${data.maxHp} | Gold: ${data.gold || 0}G | Saved: ${dateStr}`;
       slots.push({ slot: i, exists: true, summary, data });
     } catch {
       slots.push({ slot: i, exists: false, summary: '[Empty Slot]', data: null });
@@ -122,6 +125,57 @@ async function listSlots() {
   }
 
   return slots;
+}
+
+/**
+ * Ensures a pre-configured developer testing save file exists in Slot 5 if empty.
+ * Populates DevTester (Lv. 20, high stats, Tier 1 & 2 equipment, full consumables, 5000G, all skills).
+ * @param {boolean} force - If true, overwrites Slot 5 even if it exists
+ */
+async function ensureDevSaveSlot(force = false) {
+  await ensureSavesDir();
+  const filePath = getSlotPath(5);
+  if (!force) {
+    try {
+      await fs.access(filePath);
+      return; // Already exists
+    } catch {
+      // File does not exist, proceed to generate
+    }
+  }
+
+  const devHero = new Combatant('DevTester', 500, 200, 45, 35, 40, 35, 25, 20, false);
+  devHero.level = 20;
+  devHero.exp = 0;
+  devHero.nextLevelExp = 2000;
+  devHero.gold = 5000;
+  devHero.archetype = 'warrior';
+  devHero.skills = [
+    'fire1', 'thunder1', 'ice1', 'heal1', 'protect1', 'powerup1',
+    'heavySlash', 'armorBreak', 'quickStrike',
+    'firestorm1', 'thunderstorm1', 'blizzard1', 'whirlwind'
+  ];
+  devHero.passives = ['vigor', 'focused'];
+  devHero.inventory = [
+    { id: 'potion', quantity: 15 },
+    { id: 'ether', quantity: 15 },
+    { id: 'remedy', quantity: 10 },
+    { id: 'iron_sword', quantity: 1 },
+    { id: 'bronze_plate', quantity: 1 },
+    { id: 'swift_treads', quantity: 1 },
+    { id: 'silver_amulet', quantity: 1 }
+  ];
+  devHero.equipment = {
+    weapon: 'iron_sword',
+    chest: 'bronze_plate',
+    shoes: 'swift_treads',
+    accessory: 'silver_amulet'
+  };
+  devHero.lastSaveSlot = 5;
+
+  const data = serializePlayer(devHero);
+  data.isDevSlot = true;
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
 /**
@@ -177,4 +231,5 @@ module.exports = {
   loadSlot,
   serializePlayer,
   hydratePlayer,
+  ensureDevSaveSlot,
 };

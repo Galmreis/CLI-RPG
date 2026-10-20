@@ -1,40 +1,83 @@
 {
   "version": 1,
-  "savedAt": "2026-10-08T20:31:03.859Z",
-  "name": "Tester",
-  "level": 1,
+  "savedAt": "2026-10-20T01:09:40.041Z",
+  "name": "DevTester",
+  "level": 20,
   "exp": 0,
-  "nextLevelExp": 30,
-  "actualHp": 100,
-  "maxHp": 100,
-  "actualMp": 20,
-  "maxMp": 20,
-  "atk": 5,
-  "def": 5,
-  "mAtk": 5,
-  "mDef": 5,
-  "spd": 5,
-  "lck": 5,
-  "skills": [],
-  "passives": [],
-  "gold": 35,
+  "nextLevelExp": 2000,
+  "actualHp": 500,
+  "maxHp": 500,
+  "actualMp": 200,
+  "maxMp": 200,
+  "atk": 45,
+  "def": 35,
+  "mAtk": 40,
+  "mDef": 35,
+  "spd": 25,
+  "lck": 20,
+  "skills": [
+    "fire1",
+    "thunder1",
+    "ice1",
+    "heal1",
+    "protect1",
+    "powerup1",
+    "heavySlash",
+    "armorBreak",
+    "quickStrike",
+    "firestorm1",
+    "thunderstorm1",
+    "blizzard1",
+    "whirlwind"
+  ],
+  "passives": [
+    "vigor",
+    "focused"
+  ],
+  "archetype": "warrior",
+  "gold": 5000,
   "lastSaveSlot": 5,
   "inventory": [
     {
       "id": "potion",
-      "quantity": 99
+      "quantity": 15
+    },
+    {
+      "id": "ether",
+      "quantity": 15
+    },
+    {
+      "id": "remedy",
+      "quantity": 10
+    },
+    {
+      "id": "iron_sword",
+      "quantity": 1
+    },
+    {
+      "id": "bronze_plate",
+      "quantity": 1
+    },
+    {
+      "id": "swift_treads",
+      "quantity": 1
+    },
+    {
+      "id": "silver_amulet",
+      "quantity": 1
     }
   ],
   "equipment": {
-    "weapon": null,
-    "chest": null,
-    "shoes": null,
-    "accessory": null
+    "weapon": "iron_sword",
+    "chest": "bronze_plate",
+    "shoes": "swift_treads",
+    "accessory": "silver_amulet"
   },
   "resistances": {
     "physical": 1,
     "fire": 1,
     "ice": 1,
     "thunder": 1
-  }
+  },
+  "isDevSlot": true
 }

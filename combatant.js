@@ -41,6 +41,7 @@ class Combatant {
     this.armorBreakTurns = 0;
     this.passives = [];
     this.skills = [];
+    this.archetype = 'warrior';
     this.inventory = [];
     this.gold = 0;
     this.level = 1;

@@ -68,7 +68,49 @@ async function testDungeonLoop() {
   assert.strictEqual(bossUnlocked, true, "Boss chamber must be unlocked at 5 kills");
   console.log("✔ 5-kill quota to unlock Goblin King boss verified.");
 
-  console.log("\nALL DUNGEON LOOP TESTS PASSED SUCCESSFULLY! (5/5)");
+  // 6. First-Person Dungeon Renderer & Step Animation
+  const { renderDungeonScreen, animateDungeonStep, DUNGEON_SCENES } = require('./ui');
+  assert.ok(DUNGEON_SCENES.corridor, "corridor scene must exist");
+  assert.ok(DUNGEON_SCENES.chest, "chest scene must exist");
+  assert.ok(DUNGEON_SCENES.spring, "spring scene must exist");
+  assert.ok(DUNGEON_SCENES.stairs, "stairs scene must exist");
+  assert.ok(DUNGEON_SCENES.boss_gate, "boss_gate scene must exist");
+
+  const testDungeonState = { floor: 2, depth: 3, maxDepth: 5 };
+  renderDungeonScreen(hero, testDungeonState, 'corridor', 'Testing corridor render');
+  renderDungeonScreen(hero, testDungeonState, 'chest', 'Testing chest render');
+  renderDungeonScreen(hero, testDungeonState, 'spring', 'Testing spring render');
+  renderDungeonScreen(hero, testDungeonState, 'stairs', 'Testing stairs render');
+  renderDungeonScreen(hero, testDungeonState, 'boss_gate', 'Testing boss gate render');
+  await animateDungeonStep(hero, testDungeonState, { headless: true });
+  console.log("✔ SMT-style first-person dungeon wireframe screens & step animation verified.");
+
+  // 7. Random Loot Generator & Tier 2 Equipment
+  const { generateRandomLoot, EQUIPMENT } = require('./equipment');
+  assert.ok(EQUIPMENT.iron_sword, "Iron Broadsword must exist in equipment catalog");
+  assert.ok(EQUIPMENT.bronze_plate, "Bronze Breastplate must exist in equipment catalog");
+  assert.ok(EQUIPMENT.swift_treads, "Swift Treads must exist in equipment catalog");
+  assert.ok(EQUIPMENT.silver_amulet, "Silver Amulet must exist in equipment catalog");
+
+  let gotLoot = false;
+  for (let roll = 0; roll < 50; roll++) {
+    const loot = generateRandomLoot(4); // Floor 4
+    assert.ok(loot.type, "Loot must have a type");
+    if (loot.type === 'equipment' && (loot.id === 'iron_sword' || loot.id === 'bronze_plate' || loot.id === 'swift_treads' || loot.id === 'silver_amulet')) {
+      gotLoot = true;
+    }
+  }
+  assert.strictEqual(gotLoot, true, "Floor 4 chests must roll Tier 2 equipment");
+  console.log("✔ Randomized chest loot and Tier 2 equipment drops verified.");
+
+  // 8. 5-Floor Level Scaling
+  const floor1Monster = createEnemy('goblin', 1);
+  const floor4Monster = createEnemy('golem', 7);
+  assert.ok(floor4Monster.maxHp > floor1Monster.maxHp, "Floor 4 monsters must have higher stats than Floor 1");
+  assert.strictEqual(floor4Monster.level, 7, "Floor 4 monsters scale to appropriate level");
+  console.log("✔ 5-Floor enemy level scaling verified.");
+
+  console.log("\nALL DUNGEON LOOP TESTS PASSED SUCCESSFULLY! (8/8)");
 }
 
 testDungeonLoop().catch((err) => {

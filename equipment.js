@@ -46,6 +46,43 @@ const EQUIPMENT = {
     lck: 1,
     description: 'A braided leather band boosting stamina and fortune (+10 Max HP, +1 LCK).',
   },
+
+  // Tier 2 Equipment (Found in Deeper Dungeon Floors)
+  iron_sword: {
+    id: 'iron_sword',
+    name: 'Iron Broadsword',
+    slot: 'weapon',
+    atk: 7,
+    description: 'A heavy forged iron blade that cleaves with formidable power (+7 ATK).',
+  },
+
+  bronze_plate: {
+    id: 'bronze_plate',
+    name: 'Bronze Breastplate',
+    slot: 'chest',
+    def: 6,
+    maxHp: 25,
+    description: 'Hammered bronze armor deflecting fatal blows (+6 DEF, +25 Max HP).',
+  },
+
+  swift_treads: {
+    id: 'swift_treads',
+    name: 'Swift Treads',
+    slot: 'shoes',
+    spd: 5,
+    def: 2,
+    description: 'Reinforced light boots granting swift agility (+5 SPD, +2 DEF).',
+  },
+
+  silver_amulet: {
+    id: 'silver_amulet',
+    name: 'Silver Amulet',
+    slot: 'accessory',
+    mDef: 5,
+    maxMp: 20,
+    lck: 3,
+    description: 'A polished silver talisman humming with mystic warding (+5 M.DEF, +20 Max MP, +3 LCK).',
+  },
 };
 
 /**
@@ -200,6 +237,43 @@ function unequipItem(combatant, slot) {
   };
 }
 
+/**
+ * Generates randomized chest loot based on dungeon floor depth.
+ * Returns { type: 'gold' | 'item' | 'equipment', id?: string, name: string, quantity?: number, gold?: number }
+ */
+function generateRandomLoot(floor = 1) {
+  const roll = Math.random();
+
+  // 35% Chance: Gold Cache (scales with floor: e.g. 20-50 on F1, 100-250 on F5)
+  if (roll < 0.35) {
+    const gold = Math.floor(Math.random() * (25 * floor)) + (15 * floor);
+    return { type: 'gold', gold, name: `${gold} Gold` };
+  }
+
+  // 35% Chance: Consumable Item (Potion, Ether, Remedy)
+  if (roll < 0.70) {
+    const items = ['potion', 'ether', 'remedy'];
+    const chosen = items[Math.floor(Math.random() * items.length)];
+    const qty = Math.random() < 0.3 ? 2 : 1;
+    return { type: 'item', id: chosen, quantity: qty, name: `${qty}x ${chosen.toUpperCase()}` };
+  }
+
+  // 30% Chance: Equipment drop!
+  const tier1 = ['leather_shiv', 'leather_chest', 'leather_boots', 'leather_wristband'];
+  const tier2 = ['iron_sword', 'bronze_plate', 'swift_treads', 'silver_amulet'];
+
+  let pool = tier1;
+  if (floor >= 3) {
+    pool = Math.random() < 0.75 ? tier2 : tier1;
+  } else if (floor >= 2) {
+    pool = Math.random() < 0.40 ? tier2 : tier1;
+  }
+
+  const chosenId = pool[Math.floor(Math.random() * pool.length)];
+  const gear = EQUIPMENT[chosenId];
+  return { type: 'equipment', id: chosenId, name: gear.name, slot: gear.slot };
+}
+
 module.exports = {
   EQUIPMENT_SLOTS,
   EQUIPMENT,
@@ -208,4 +282,5 @@ module.exports = {
   addEquipment,
   equipItem,
   unequipItem,
+  generateRandomLoot,
 };

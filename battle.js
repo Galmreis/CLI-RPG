@@ -6,13 +6,17 @@
 
 const readline = require('readline/promises');
 const Combatant = require('./combatant');
-const { renderBattleScreen } = require('./ui');
+const {
+  renderBattleScreen,
+  animateScreenShake,
+  animateWeaknessFlash,
+  animateDodge,
+  sleep,
+} = require('./ui');
 const { SKILLS } = require('./skills');
 const { ITEMS, useItem, addItem } = require('./items');
 const { createEnemy } = require('./enemies');
 const { selectMenu } = require('./menu');
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ACTION_GAUGE_MAX = 10000;
 
@@ -234,19 +238,29 @@ async function runBattle(player, enemiesInput, existingRl) {
             if (actRes.index === 0) {
               // Physical Attack with Target Selection
               const target = await selectTarget(rl, aliveEnemies, player, enemyParty, currentTurnOrder, logMessage);
+              const targetIdx = aliveEnemies.indexOf(target);
               const res = player.attack(target);
               let powerUpNote = res.powerUpUsed ? " [POWER UP RELEASED!]" : "";
               if (res.isDodged) {
                 logMessage = `[DODGED!] ${target.name} swiftly evaded ${player.name}'s attack! (0 dmg)`;
+                await animateDodge(player, enemyParty, currentTurnOrder, logMessage, targetIdx);
               } else if (res.isAbsorbed) {
                 logMessage = `[ABSORBED!] ${target.name} absorbed the physical blow and recovered ${Math.abs(res.damage)} HP!${powerUpNote}`;
+                renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage, targetIdx);
               } else if (res.isImmune) {
                 logMessage = `[IMMUNE!] ${target.name} is completely immune to physical attacks!`;
+                renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage, targetIdx);
               } else if (res.isCrit) {
                 logMessage = `[CRITICAL HIT!] ${player.name} strikes fiercely for ${res.damage} damage to ${target.name}!${powerUpNote}`;
+                await animateScreenShake(player, enemyParty, currentTurnOrder, logMessage, targetIdx, { frames: 10, intensity: 3 });
               } else {
                 let resTag = res.isWeakness ? " [WEAKNESS HIT!]" : (res.isResisted ? " [RESISTED]" : "");
                 logMessage = `${player.name} attacks ${target.name} for ${res.damage} damage!${powerUpNote}${resTag}`;
+                if (res.isWeakness) {
+                  await animateWeaknessFlash(player, enemyParty, currentTurnOrder, logMessage, targetIdx);
+                } else {
+                  renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage, targetIdx);
+                }
               }
               if (!target.isAlive()) {
                 logMessage = `${target.name} was defeated! | ${logMessage}`;
@@ -342,6 +356,14 @@ async function runBattle(player, enemiesInput, existingRl) {
                     logMessage = `${target.name} was defeated! | ${logMessage}`;
                   }
 
+                  if (typeof skillResult === 'string' && skillResult.includes('[WEAKNESS!]')) {
+                    await animateWeaknessFlash(player, enemyParty, currentTurnOrder, logMessage);
+                  } else if (player.skills[skIdx] === 'whirlwind' || player.skills[skIdx] === 'heavySlash') {
+                    await animateScreenShake(player, enemyParty, currentTurnOrder, logMessage, 0, { frames: 8, intensity: 2 });
+                  } else {
+                    renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage);
+                  }
+
                   actionTaken = true;
                   skillSelected = true;
                 } else {
@@ -409,15 +431,24 @@ async function runBattle(player, enemiesInput, existingRl) {
             const res = combatant.attack(player);
             if (res.isDodged) {
               logMessage = `[DODGED!] ${player.name} gracefully evaded ${combatant.name}'s attack!`;
+              await animateDodge(player, enemyParty, currentTurnOrder, logMessage, 0);
             } else if (res.isAbsorbed) {
               logMessage = `[ABSORBED!] ${player.name} absorbed the physical blow and recovered ${Math.abs(res.damage)} HP!`;
+              renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage);
             } else if (res.isImmune) {
               logMessage = `[IMMUNE!] ${player.name} is completely immune to physical attacks!`;
+              renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage);
             } else if (res.isCrit) {
               logMessage = `[CRITICAL HIT!] ${combatant.name} lands a crushing blow for ${res.damage} damage!`;
+              await animateScreenShake(player, enemyParty, currentTurnOrder, logMessage, 0, { frames: 10, intensity: 3 });
             } else {
               let resTag = res.isWeakness ? " [WEAKNESS HIT!]" : (res.isResisted ? " [RESISTED]" : "");
               logMessage = `${combatant.name} attacks ${player.name} for ${res.damage} damage!${resTag}`;
+              if (res.isWeakness) {
+                await animateWeaknessFlash(player, enemyParty, currentTurnOrder, logMessage, 0);
+              } else {
+                renderBattleScreen(player, enemyParty, currentTurnOrder, logMessage);
+              }
             }
 
             // Check if attack triggered a passive minion summon (e.g. Royal Focus)
